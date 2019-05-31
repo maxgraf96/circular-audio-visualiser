@@ -1,4 +1,6 @@
-let waveform, player, spectrum;
+let waveform, player, spectrum, sampleRate;
+let spectralCentroid, scMin, scMax, colorMap;
+let audioInitialized = false;
 let cx = 0;
 let cy = 0;
 
@@ -6,21 +8,44 @@ function preload() {
     soundFormats('mp3', 'ogg', 'wav');
     player = loadSound('assets/hitme_1.wav');
 
-    var request = new AudioFileRequest('assets/hitme_1.wav');
+    var request = new AudioFileRequest('assets/jazzo.wav');
     console.log(request);
 
     request.onSuccess = (decoded) => {
         console.log(decoded);
-        let mono = stereo2Mono(decoded.channels[0], decoded.channels[1]);
+        sampleRate = decoded.sampleRate;
+        let mono = Float32Array.from(stereo2Mono(decoded.channels[0], decoded.channels[1]));
+
+        let barkBandsFilter = xtract_init_bark(1024, sampleRate);
+        let barkBands = xtract_bark_coefficients(mono, barkBandsFilter);
+        console.log(barkBands);
+        let loudness = xtract_loudness(barkBands);
+        // console.log(loudness);
+
         spectrum = [];
+        spectralCentroid = [];
         let i = 0;
         while (i < mono.length - 1024) {
             let current = mono.slice(i, i + 1024);
             let fft = new FFT(1024, decoded.sampleRate);
-            spectrum = spectrum.concat(fft.forward(current));
+            let currentSpec = fft.forward(current);
+            spectrum = spectrum.concat(currentSpec);
+            spectralCentroid = spectralCentroid.concat(xtract_spectral_centroid(currentSpec) * 1000000000);
             i += 1024;
         }
-        console.log(spectrum);
+
+        // spectralCentroid = spectralCentroid.map(e => Math.log(e));
+        // console.log("SC", spectralCentroid);
+
+        // Create colorMap for spectral centroid
+        scMax = Math.max.apply(null, spectralCentroid);
+        scMin = Math.min.apply(null, spectralCentroid);
+
+        colorMap = [];
+        for (let i = 0.01; i < 1; i += 0.01){
+            let interpol = _interpolateColor(h2r("#82ccdd"), h2r("#a1eeff"), i);
+            colorMap.push(interpol);
+        }
     };
     request.onFailure = (decoded) => {
         console.log("ERROR");
@@ -36,46 +61,33 @@ function setup() {
     cy = height / 2;
 
     stroke(0); // Set line drawing color to black
-    frameRate(25);
+    frameRate(1);
 
     player.setVolume(1);
-    waveform = player.getPeaks();
-    player.play();
-
-    // let audioCtx = new (AudioContext || webkitAudioContext)();
-    // let fileInput = document.getElementById('audio-file');
-    // let btn = document.getElementById('btn');
-    // btn.addEventListener("click", () => {
-    //     // check for file
-    //     if(fileInput.files[0] === undefined) {
-    //         // Stop the process and tell the user they need to upload a file.
-    //         return false;
-    //     }
-    //     let fileReader = new FileReader();
-    //     fileReader.onload = function(ev) {
-    //         // Decode audio
-    //         audioCtx.decodeAudioData(ev.target.result).then((buffer) => {
-    //             let soundSource = audioCtx.createBufferSource();
-    //             soundSource.buffer = buffer;
-    //             console.log(buffer.getChannelData(0));
-    //         });
-    //     };
-    //     fileReader.readAsArrayBuffer(fileInput.files[0]);
-    // }, false);
+    waveform = player.getPeaks(5000);
 }
 
 function draw() {
     background(255); // Set the background to white
 
+    stroke("#000000");
     drawPeakCircle(waveform, 300);
 
-    drawFrequencyCircle(30, 50);
-    drawFrequencyCircle(100, 100);
-    drawFrequencyCircle(256, 150);
-    drawFrequencyCircle(400, 200);
+    drawSpectralCentroid();
 
-    drawPlayerIndicator(player.currentTime(), player.duration());
+    stroke(colorAlpha("#b71540", 0.2));
+    drawFrequencyCircle(200, 100, 300);
+    stroke(colorAlpha("#eb2f06", 0.2));
+    drawFrequencyCircle(1000, 150, 600);
+    stroke(colorAlpha("#f6b93b", 0.3));
+    drawFrequencyCircle(5000, 180);
+    stroke(colorAlpha("#fad390", 0.4));
+    drawFrequencyCircle(12000, 210);
 
+    if(audioInitialized){
+        stroke("#000000");
+        drawPlayerIndicator(player.currentTime(), player.duration());
+    }
 }
 
 drawPeakCircle = (waveform, radius) => {
@@ -94,25 +106,50 @@ drawPeakCircle = (waveform, radius) => {
     }
 };
 
-drawFrequencyCircle = (frequencyBin, radius) => {
-    if (frequencyBin < 0 ||frequencyBin > 512) {
-        throw new Error("Frequency bin must be between 0 and 512.");
+drawFrequencyCircle = (frequency, radius, multiplicator = 2000) => {
+    if (frequency < 0 ||frequency > sampleRate / 2) {
+        throw new Error("Frequency bin must be between 0 and " + sampleRate / 2 + ".");
     }
+
+    // Map frequency to 512 frequency bins
+    let fBin = Math.floor((frequency * 512) / (sampleRate / 2));
+
     for (let a = 0; a < 2 * Math.PI; a += Math.PI / spectrum.length){
         // Map angle to array length
         let i = Math.floor((a / (2 * Math.PI)) * spectrum.length);
 
         let px1 = cx + Math.sin(a) * radius;
         let py1 = cy + Math.cos(a) * radius;
-        let px2 = cx + Math.sin(a) * (radius + spectrum[i][frequencyBin] * 2000);
-        let py2 = cy + Math.cos(a) * (radius + spectrum[i][frequencyBin] * 2000);
+        let px2 = cx + Math.sin(a) * (radius + spectrum[i][fBin] * multiplicator);
+        let py2 = cy + Math.cos(a) * (radius + spectrum[i][fBin] * multiplicator);
+
+        line(px1, py1, px2, py2);
+    }
+};
+
+drawSpectralCentroid = () => {
+    let radius = 100;
+
+    for (let a = 0; a < 2 * Math.PI; a += Math.PI / spectralCentroid.length){
+        // Map angle to array length
+        let i = Math.floor((a / (2 * Math.PI)) * spectralCentroid.length);
+
+        // Map spectral centroid to color
+        let c = Math.floor((spectralCentroid[i] / scMax) * 98);
+        let colour = r2h(colorMap[c]);
+        stroke(colorAlpha(colour, 0.3));
+
+        let px1 = cx + Math.sin(a) * radius;
+        let py1 = cy + Math.cos(a) * radius;
+        let px2 = cx + Math.sin(a) * (radius + 200);
+        let py2 = cy + Math.cos(a) * (radius + 200);
 
         line(px1, py1, px2, py2);
     }
 };
 
 drawPlayerIndicator = (currentTime, totalDuration) => {
-    let length = 300;
+    let length = 100;
     let a = (currentTime / totalDuration) * 2 * Math.PI;
     let px1 = cx;
     let py1 = cy;
@@ -121,3 +158,11 @@ drawPlayerIndicator = (currentTime, totalDuration) => {
 
     line(px1, py1, px2, py2);
 };
+
+function touchStarted() {
+    if (getAudioContext().state !== 'running') {
+        getAudioContext().resume();
+    }
+    audioInitialized = true;
+    player.play();
+}
