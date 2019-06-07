@@ -23,12 +23,12 @@ AudioFileRequest.prototype.send = function() {
         return;
     }
 
-    var request = new XMLHttpRequest();
+    let request = new XMLHttpRequest();
     request.open('GET', this.url, this.async);
     request.overrideMimeType('text/plain; charset=x-user-defined');
     request.onreadystatechange = function(event) {
-        if (request.readyState == 4) {
-            if (request.status == 200 || request.status == 0) {
+        if (request.readyState === 4) {
+            if (request.status === 200 || request.status === 0) {
                 this.handleResponse(request.responseText);
             }
             else {
@@ -40,12 +40,12 @@ AudioFileRequest.prototype.send = function() {
 };
 
 AudioFileRequest.prototype.handleResponse = function(data) {
-    var decoder, decoded;
-    if (this.extension == 'wav') {
+    let decoder, decoded;
+    if (this.extension === 'wav') {
         decoder = new WAVDecoder();
         decoded = decoder.decode(data);
     }
-    else if (this.extension == 'aiff' || this.extension == 'aif') {
+    else if (this.extension === 'aiff' || this.extension === 'aif') {
         decoder = new AIFFDecoder();
         decoded = decoder.decode(data);
     }
@@ -127,12 +127,12 @@ function WAVDecoder(data) {
 WAVDecoder.prototype.__proto__ = Decoder.prototype;
 
 WAVDecoder.prototype.decode = function(data) {
-    var decoded = {};
-    var offset = 0;
+    let decoded = {};
+    let offset = 0;
     // Header
     var chunk = this.readChunkHeaderL(data, offset);
     offset += 8;
-    if (chunk.name != 'RIFF') {
+    if (chunk.name !== 'RIFF') {
         console.error('File is not a WAV');
         return null;
     }
@@ -142,7 +142,7 @@ WAVDecoder.prototype.decode = function(data) {
 
     var wave = this.readString(data, offset, 4);
     offset += 4;
-    if (wave != 'WAVE') {
+    if (wave !== 'WAVE') {
         console.error('File is not a WAV');
         return null;
     }
@@ -150,12 +150,12 @@ WAVDecoder.prototype.decode = function(data) {
     while (offset < fileLength) {
         var chunk = this.readChunkHeaderL(data, offset);
         offset += 8;
-        if (chunk.name == 'fmt ') {
+        if (chunk.name === 'fmt ') {
             // File encoding
             var encoding = this.readIntL(data, offset, 2);
             offset += 2;
 
-            if (encoding != 0x0001) {
+            if (encoding !== 0x0001) {
                 // Only support PCM
                 console.error('Cannot decode non-PCM encoded WAV file');
                 return null;
@@ -181,7 +181,7 @@ WAVDecoder.prototype.decode = function(data) {
             offset += 2;
         }
 
-        else if (chunk.name == 'data') {
+        else if (chunk.name === 'data') {
             // Data must come after fmt, so we are okay to use it's variables
             // here
             var length = chunk.length / (bytesPerSample * numberOfChannels);

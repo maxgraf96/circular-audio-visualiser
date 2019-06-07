@@ -27149,7 +27149,7 @@ module.exports={
             "line": " src/image/p5.Image.js:223"
         },
         {
-            "message": "Missing item type\nGenerate a blob of file data as a url to prepare for download.\nAccepts an array of data, a filename, and an extension (optional).\nThis is a private function because it does not do any formatting,\nbut it is used by <a href=\"#/p5/saveStrings\">saveStrings</a>, <a href=\"#/p5/saveJSON\">saveJSON</a>, <a href=\"#/p5/saveTable\">saveTable</a> etc.",
+            "message": "Missing item type\nGenerate a blob of file data as a url to beatDetection for download.\nAccepts an array of data, a filename, and an extension (optional).\nThis is a private function because it does not do any formatting,\nbut it is used by <a href=\"#/p5/saveStrings\">saveStrings</a>, <a href=\"#/p5/saveJSON\">saveJSON</a>, <a href=\"#/p5/saveTable\">saveTable</a> etc.",
             "line": " src/io/files.js:1771"
         },
         {
@@ -64559,7 +64559,7 @@ p5.prototype.saveTable = function(table, filename, options) {
 }; // end saveTable()
 
 /**
- *  Generate a blob of file data as a url to prepare for download.
+ *  Generate a blob of file data as a url to beatDetection for download.
  *  Accepts an array of data, a filename, and an extension (optional).
  *  This is a private function because it does not do any formatting,
  *  but it is used by <a href="#/p5/saveStrings">saveStrings</a>, <a href="#/p5/saveJSON">saveJSON</a>, <a href="#/p5/saveTable">saveTable</a> etc.

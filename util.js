@@ -35,67 +35,57 @@ _interpolateColor = (color1, color2, factor) => {
     return result;
 };
 
-var rgb2hsl = function(color) {
-    var r = color[0]/255;
-    var g = color[1]/255;
-    var b = color[2]/255;
-
-    var max = Math.max(r, g, b), min = Math.min(r, g, b);
-    var h, s, l = (max + min) / 2;
-
-    if (max == min) {
-        h = s = 0; // achromatic
-    } else {
-        var d = max - min;
-        s = (l > 0.5 ? d / (2 - max - min) : d / (max + min));
-        switch(max) {
-            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
-            case g: h = (b - r) / d + 2; break;
-            case b: h = (r - g) / d + 4; break;
-        }
-        h /= 6;
-    }
-
-    return [h, s, l];
-};
-
-var hsl2rgb = function(color) {
-    var l = color[2];
-
-    if (color[1] == 0) {
-        l = Math.round(l*255);
-        return [l, l, l];
-    } else {
-        function hue2rgb(p, q, t) {
-            if (t < 0) t += 1;
-            if (t > 1) t -= 1;
-            if (t < 1/6) return p + (q - p) * 6 * t;
-            if (t < 1/2) return q;
-            if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
-            return p;
-        }
-
-        var s = color[1];
-        var q = (l < 0.5 ? l * (1 + s) : l + s - l * s);
-        var p = 2 * l - q;
-        var r = hue2rgb(p, q, color[0] + 1/3);
-        var g = hue2rgb(p, q, color[0]);
-        var b = hue2rgb(p, q, color[0] - 1/3);
-        return [Math.round(r*255), Math.round(g*255), Math.round(b*255)];
-    }
-};
-
-var _interpolateHSL = function(color1, color2, factor) {
-    if (arguments.length < 3) { factor = 0.5; }
-    var hsl1 = rgb2hsl(color1);
-    var hsl2 = rgb2hsl(color2);
-    for (var i=0;i<3;i++) {
-        hsl1[i] += factor*(hsl2[i]-hsl1[i]);
-    }
-    return hsl2rgb(hsl1);
-};
-
 function colorAlpha(aColor, alpha) {
     let c = color(aColor);
     return color('rgba(' +  [red(c), green(c), blue(c), alpha].join(',') + ')');
+}
+
+/* Functions for color maps */
+function interpolateLinearly(x, values) {
+    // Split values into four lists
+    var x_values = [];
+    var r_values = [];
+    var g_values = [];
+    var b_values = [];
+    for (i in values) {
+        x_values.push(values[i][0]);
+        r_values.push(values[i][1][0]);
+        g_values.push(values[i][1][1]);
+        b_values.push(values[i][1][2]);
+    }
+    var i = 1;
+    while (x_values[i] < x) {
+        i = i+1;
+    }
+    i = i-1;
+    var width = Math.abs(x_values[i] - x_values[i+1]);
+    var scaling_factor = (x - x_values[i]) / width;
+    // Get the new color values though interpolation
+    var r = r_values[i] + scaling_factor * (r_values[i+1] - r_values[i])
+    var g = g_values[i] + scaling_factor * (g_values[i+1] - g_values[i])
+    var b = b_values[i] + scaling_factor * (b_values[i+1] - b_values[i])
+    return to255([enforceBounds(r), enforceBounds(g), enforceBounds(b)]);
+}
+
+function to255(x){
+    return [Math.floor(x[0] * 255), Math.floor(x[1] * 255), Math.floor(x[2] * 255)];
+}
+
+function enforceBounds(x) {
+    if (x < 0) {
+        return 0;
+    } else if (x > 1){
+        return 1;
+    } else {
+        return x;
+    }
+}
+
+// helper for writing color to array
+function writeColor(image, x, y, red, green, blue, alpha) {
+    let index = (x + y * width) * 4;
+    image.pixels[index] = red;
+    image.pixels[index + 1] = green;
+    image.pixels[index + 2] = blue;
+    image.pixels[index + 3] = alpha;
 }
